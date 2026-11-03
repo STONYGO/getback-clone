@@ -272,11 +272,21 @@ async function runCalib() {
   $("#calNum").textContent = ""; $("#calMsg").innerHTML = "そのまま<b>動かずに</b>画面を見ていてください";
   S.samples = []; S.calibrating = true;
   const t0 = performance.now();
-  await new Promise((res) => { const tick = () => { const p = Math.min(1, (performance.now() - t0) / CAL_MS); $("#calArc").style.strokeDashoffset = CRING * (1 - p); p < 1 ? requestAnimationFrame(tick) : res(); }; tick(); });
+  // 低速なPCでも安定するよう、4秒経過かつ30サンプル以上で終了（最長12秒）
+  await new Promise((res) => {
+    const tick = () => {
+      const el = performance.now() - t0;
+      const p = Math.min(1, Math.max(el / CAL_MS * (S.samples.length >= 30 ? 1 : 0.85), S.samples.length / 30 * 0.85));
+      $("#calArc").style.strokeDashoffset = CRING * (1 - p);
+      const done = (el >= CAL_MS && S.samples.length >= 30) || el >= CAL_MS * 3;
+      done ? res() : setTimeout(tick, 50);
+    };
+    tick();
+  });
   S.calibrating = false;
   const smp = S.samples;
   const fail = (m) => { $("#calTitle").textContent = "もう一度お願いします"; $("#calMsg").innerHTML = m; $("#calGo").disabled = false; $("#calGo").textContent = "再試行"; };
-  if (smp.length < 30) return fail(PRODUCT.requiresShoulders ? "両肩が十分に映っていませんでした。カメラを少し離すか下向きにしてください。" : "顔が十分に映っていませんでした。明るい場所で再度お試しください。");
+  if (smp.length < 12) return fail(PRODUCT.requiresShoulders ? "両肩が十分に映っていませんでした。カメラを少し離すか下向きにしてください。" : "顔が十分に映っていませんでした。明るい場所で再度お試しください。");
   const B = {};
   for (const k of Object.keys(smp[0])) {
     const v = smp.map((s) => s[k]).filter((x) => x != null && isFinite(x)).sort((a, b) => a - b);
