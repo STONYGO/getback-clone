@@ -1,0 +1,56 @@
+name: Real-model integration test
+
+on:
+  push:
+    branches: [main]
+    paths: ["core/**", "getback/**", "kamae/**", "kamae-ai/**", "desktop/**", "tests/**", ".github/workflows/realtest.yml"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch test fixture (stock photo of a person)
+        run: |
+          mkdir -p tests/fixtures
+          for u in \
+            "https://cdn.pixabay.com/photo/2019/03/12/20/39/girl-4051811_960_720.jpg" \
+            "https://storage.googleapis.com/mediapipe-assets/pose.jpg" ; do
+            if curl -fsSL -A "Mozilla/5.0" -o tests/fixtures/person.jpg "$u"; then echo "fixture: $u"; break; fi
+          done
+          test -s tests/fixtures/person.jpg
+      - name: Install Playwright
+        working-directory: tests
+        run: npm install --no-audit --no-fund && npx playwright install --with-deps chromium
+      - name: Web (3 products) with real model
+        id: web
+        continue-on-error: true
+        run: |
+          python3 -m http.server 8080 >/dev/null 2>&1 &
+          sleep 2
+          node tests/real-model.mjs tests/fixtures/person.jpg http://localhost:8080 test-results
+      - name: Desktop app (bundled model)
+        id: desktop
+        continue-on-error: true
+        working-directory: desktop
+        run: |
+          npm install --no-audit --no-fund
+          rc=0
+          for P in kamae-ai getback; do
+            PRODUCT=$P npm run prepare-assets
+            xvfb-run -a node ../tests/electron-real.mjs ../tests/fixtures/person.jpg ../test-results || rc=1
+          done
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results
+      - name: Result
+        if: steps.web.outcome != 'success' || steps.desktop.outcome != 'success'
+        run: exit 1
