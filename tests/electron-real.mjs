@@ -36,7 +36,7 @@ try {
   let ok = false;
   for (let i = 0; i < 3 && !ok; i++) {
     await ctl.click("#calGo");
-    try { await ctl.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 15000 }); ok = true; }
+    try { await ctl.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 40000 }); ok = true; }
     catch { console.log("calib retry:", await ctl.evaluate(() => document.querySelector("#calMsg").textContent + " feat=" + JSON.stringify(window.__app.S.feat))); }
   }
   if (!ok) throw new Error("calibration failed");

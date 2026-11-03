@@ -20,7 +20,12 @@ export const CAM_SCRIPT = async (img) => {
     x.save(); x.translate(320 + p.dx * 640, 240 + p.dy * 480); x.rotate((p.rot * Math.PI) / 180);
     const ox = -tw / 2, oy = -th / 2 + 40 * p.scale, nk = neck - crop.sy;
     x.drawImage(im, crop.sx, crop.sy + nk, crop.sw, crop.sh - nk, ox, oy + nk * k, tw, (crop.sh - nk) * k); // 体
-    x.drawImage(im, crop.sx, crop.sy, crop.sw, nk, ox, oy + p.sink * sw * k, tw, nk * k);                      // 頭（沈み込み）
+    if (p.sink) { // 頭部の中央帯（顔幅）だけを下げ、両肩は隠さない
+      const hw = crop.sw * 0.42, hx = crop.sx + (crop.sw - hw) / 2;
+      x.drawImage(im, crop.sx, crop.sy, crop.sw, nk, ox, oy, tw, nk * k);
+      x.fillStyle = "#9aa3ad"; x.fillRect(ox + (hx - crop.sx) * k, oy, hw * k, nk * k);
+      x.drawImage(im, hx, crop.sy, hw, nk, ox + (hx - crop.sx) * k, oy + p.sink * sw * k, hw * k, nk * k);
+    } else x.drawImage(im, crop.sx, crop.sy, crop.sw, nk, ox, oy, tw, nk * k); // 頭
     x.restore(); requestAnimationFrame(draw);
   };
   draw();

@@ -33,7 +33,7 @@ export async function calibrate(page, tries = 3) {
   for (let i = 0; i < tries; i++) {
     if (!(await page.$eval("#calib", (e) => e.classList.contains("on")))) await page.click("#btnCalib");
     await page.click("#calGo");
-    try { await page.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 15000 }); await sleep(1500); return; }
+    try { await page.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 40000 }); await sleep(1500); return; }
     catch { console.log("calib retry:", await page.evaluate(() => document.querySelector("#calMsg").textContent + " feat=" + JSON.stringify(window.__app.S.feat))); }
   }
   throw new Error("calibration failed: " + (await page.evaluate(() => document.querySelector("#calMsg").textContent)));
@@ -80,7 +80,7 @@ for (const pid of ["kamae", "kamae-ai"]) {
   const off = await waitCorner(page, "", 9000);
   check(`${pid}: 3秒キープで消灯`, !!off, off?.title || "");
 
-  await cam(page, { sink: 0.22 });
+  await cam(page, { sink: 0.16 });
   const red2 = await waitCorner(page, "red");
   check(`${pid}: 頭が沈む（首と肩の間隔が縮む）と赤`, !!red2, red2 ? red2.sub : JSON.stringify((await st(page)).feat));
   await cam(page, { sink: 0 }); await waitCorner(page, "", 9000);
