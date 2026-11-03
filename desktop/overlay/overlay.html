@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>GetBack Overlay</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif}
+  #c{position:fixed;inset:0;opacity:0;transition:opacity .45s ease;--corner:transparent;--s:38vmin}
+  #c.on{opacity:1}
+  #c i{position:absolute;width:var(--s);height:var(--s)}
+  #c i:nth-child(1){top:0;left:0;background:radial-gradient(circle at 0 0,var(--corner) 0,transparent 70%)}
+  #c i:nth-child(2){top:0;right:0;background:radial-gradient(circle at 100% 0,var(--corner) 0,transparent 70%)}
+  #c i:nth-child(3){bottom:0;left:0;background:radial-gradient(circle at 0 100%,var(--corner) 0,transparent 70%)}
+  #c i:nth-child(4){bottom:0;right:0;background:radial-gradient(circle at 100% 100%,var(--corner) 0,transparent 70%)}
+  #c.red{--corner:rgba(255,40,40,.9)}
+  #c.red i{animation:pulse 1.1s ease-in-out infinite}
+  #c.green{--corner:rgba(30,215,105,.88)}
+  @keyframes pulse{50%{opacity:.5}}
+  #msg{position:fixed;top:18px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:12px;
+    background:rgba(15,17,21,.82);color:#fff;font-size:15px;font-weight:600;opacity:0;transition:opacity .3s;white-space:nowrap}
+  #msg.on{opacity:1}
+  #bar{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);width:min(40vw,360px);height:8px;border-radius:99px;
+    background:rgba(255,255,255,.25);overflow:hidden;opacity:0;transition:opacity .3s}
+  #bar.on{opacity:1}
+  #bar div{height:100%;width:0;background:#22d36b}
+</style>
+</head>
+<body>
+<div id="c"><i></i><i></i><i></i><i></i></div>
+<div id="msg"></div>
+<div id="bar"><div></div></div>
+<script>
+  const c = document.getElementById("c"), msg = document.getElementById("msg"),
+        bar = document.getElementById("bar"), fill = bar.firstElementChild;
+  window.overlayBridge.onUpdate(({ mode, progress = 0, msg: text = "" } = {}) => {
+    c.className = mode ? "on " + mode : "";
+    msg.textContent = text; msg.classList.toggle("on", !!mode && !!text);
+    bar.classList.toggle("on", mode === "green");
+    fill.style.width = (mode === "green" ? Math.round(progress * 100) : 0) + "%";
+  });
+</script>
+</body>
+</html>
