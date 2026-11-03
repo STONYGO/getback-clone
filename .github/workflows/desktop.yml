@@ -1,9 +1,9 @@
-name: Build desktop app
+name: Build desktop apps
 
 on:
   push:
     branches: [main]
-    paths: ["index.html", "desktop/**", ".github/workflows/desktop.yml"]
+    paths: ["core/**", "getback/**", "kamae/**", "kamae-ai/**", "desktop/**", ".github/workflows/desktop.yml"]
   workflow_dispatch:
 
 jobs:
@@ -11,23 +11,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [windows-latest, macos-14]
+        product: [getback, kamae, kamae-ai]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: desktop
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm install --no-audit --no-fund
-      - run: npm run dist
+      - name: Prepare assets
+        run: npm run prepare-assets
+        env:
+          PRODUCT: ${{ matrix.product }}
+      - name: Build
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          NAME=$(node -p "require('./product.json').name")
+          APPID=$(node -p "require('./product.json').appId")
+          SLUG=$(echo "$NAME" | tr ' ' '-')
+          npx electron-builder --publish never \
+            -c.productName="$NAME" -c.appId="$APPID" \
+            -c.nsis.artifactName="${SLUG}-Setup-\${version}.\${ext}" \
+            -c.portable.artifactName="${SLUG}-portable-\${version}.\${ext}" \
+            -c.dmg.artifactName="${SLUG}-\${version}-\${arch}.\${ext}"
       - uses: actions/upload-artifact@v4
         with:
-          name: GetBack-${{ runner.os }}
+          name: ${{ matrix.product }}-${{ runner.os }}
           path: |
             desktop/dist/*.dmg
             desktop/dist/*.exe

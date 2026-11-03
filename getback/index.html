@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja" data-product="getback">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>GetBack Clone</title>
+<link rel="stylesheet" href="../core/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="mark" id="mark"></div>
+    <div><h1 id="pname"></h1><p id="ptag"></p></div>
+    <div class="sp"></div>
+    <span class="chip exp" id="expChip" hidden>実験用</span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button data-v="v-home" aria-selected="true">今日</button>
+    <button data-v="v-history" aria-selected="false">履歴</button>
+    <button data-v="v-report" aria-selected="false">レポート</button>
+    <button data-v="v-settings" aria-selected="false">設定</button>
+  </nav>
+
+  <!-- 今日 -->
+  <section class="view on" id="v-home">
+    <div class="card hero">
+      <div class="ring">
+        <svg viewBox="0 0 188 188">
+          <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--a1)"/><stop offset="1" stop-color="var(--a2)"/></linearGradient></defs>
+          <circle class="track" cx="94" cy="94" r="80" fill="none" stroke-width="12"/>
+          <circle class="val" id="ringVal" cx="94" cy="94" r="80" fill="none" stroke="url(#grad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="502.65" stroke-dashoffset="502.65"/>
+        </svg>
+        <div class="num"><b id="ringNum">—</b><span>POSTURE</span></div>
+      </div>
+      <div class="state" id="stTitle">はじめましょう</div>
+      <div class="sub" id="stSub"></div>
+      <div class="actions">
+        <button class="btn primary" id="btnMain">はじめる</button>
+        <button class="btn" id="btnCalib">キャリブレーション</button>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><span>今日の良い姿勢率</span><b id="tRate">—</b></div>
+      <div class="tile"><span>計測時間</span><b id="tTime">0m</b></div>
+      <div class="tile"><span>警告</span><b id="tAlerts">0</b></div>
+    </div>
+
+    <div id="homeHabits" style="display:flex;flex-direction:column;gap:10px"></div>
+
+    <div class="card" id="spineCard" hidden>
+      <h3>脊柱アライメント推定<span class="r">頭部角度＋視距離 → 2次回帰（仮係数）</span></h3>
+      <div class="meters" id="spine"></div>
+    </div>
+
+    <div class="card" id="aiCard" hidden>
+      <h3><span class="pulse"></span>端末内AI<span class="r">映像・特徴量は外部送信しません</span></h3>
+      <div class="aig">
+        <div><b id="aiLearned">0</b><span>学習した瞬間</span></div>
+        <div><b id="aiDrift">0%</b><span>個人適応度</span></div>
+        <div><b id="aiPredict">—</b><span>崩れの予測</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 id="nowTitle">いまの構え<span class="r"><button class="btn sm" id="btnCam">カメラを表示</button></span></h3>
+      <div class="cam hide" id="cam"><video id="video" playsinline muted autoplay></video><canvas id="overlay"></canvas></div>
+      <div class="meters" id="meters" style="margin-top:12px"></div>
+      <p class="note" id="camNote" style="margin:12px 0 0"></p>
+    </div>
+  </section>
+
+  <!-- 履歴 -->
+  <section class="view" id="v-history">
+    <div class="card"><h3>直近7日の良い姿勢率</h3><div class="bars" id="bars"></div></div>
+    <div class="card"><h3>今日の時間帯</h3><div class="strip" id="strip"></div><div class="strip-l"><span>0時</span><span>6</span><span>12</span><span>18</span><span>24</span></div></div>
+    <div class="card"><h3>傾きの癖（未病のサイン）</h3><div id="habits" style="display:flex;flex-direction:column;gap:10px"></div><p class="note" id="m30" style="margin:12px 0 0"></p></div>
+  </section>
+
+  <!-- レポート -->
+  <section class="view" id="v-report">
+    <div class="card">
+      <h3>配信先</h3>
+      <div class="field"><label>Slack Incoming Webhook URL</label><input type="url" id="slackUrl" placeholder="https://hooks.slack.com/services/..."></div>
+      <div class="field"><label>Google Apps Script ウェブアプリURL（メール＋カレンダー）</label><input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <div class="field"><label>GAS 共有シークレット</label><input type="password" id="gasSecret" placeholder="Code.gs の SECRET と同じ値"></div>
+      <div class="field"><label>メール送信先（空欄ならGASの所有者宛て）</label><input type="email" id="email" placeholder="you@example.com"></div>
+      <div class="field" id="claudeField" hidden><label>Claude APIキー（任意・AIコーチのコメント生成）</label><input type="password" id="claudeKey" placeholder="sk-ant-..."></div>
+      <p class="note">設定方法は <a href="https://github.com/STONYGO/getback-clone/blob/main/docs/REPORTS.md" target="_blank" rel="noopener">docs/REPORTS.md</a> を参照してください。</p>
+    </div>
+    <div class="card">
+      <h3>スケジュール</h3>
+      <div class="field"><label>配信時刻</label><input type="time" id="reportTime"></div>
+      <label class="sw"><span>日次ふりかえり<small>毎日、配信時刻以降に1回</small></span><input type="checkbox" class="toggle" id="daily"></label>
+      <label class="sw"><span>月次レポート<small>毎月はじめに前月分</small></span><input type="checkbox" class="toggle" id="monthly"></label>
+      <label class="sw"><span>3か月レポート<small>1・4・7・10月に前3か月分</small></span><input type="checkbox" class="toggle" id="quarterly"></label>
+      <label class="sw"><span>カレンダーに登録<small>レポートを予定として記録</small></span><input type="checkbox" class="toggle" id="calendar"></label>
+    </div>
+    <div class="card">
+      <h3>プレビューと今すぐ送信<span class="r"><select id="pvKind" class="btn sm"><option value="day">日次</option><option value="last30">直近30日</option><option value="last90">直近90日</option></select></span></h3>
+      <div class="preview" id="preview"></div>
+      <div class="row-btns" style="margin-top:12px">
+        <button class="btn sm" data-send="day">日次を送信</button>
+        <button class="btn sm" data-send="last30">30日分を送信</button>
+        <button class="btn sm" data-send="last90">90日分を送信</button>
+      </div>
+      <p class="log" id="sendLog" style="margin:12px 0 0"></p>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="view" id="v-settings">
+    <div class="card">
+      <h3>判定</h3>
+      <div class="field"><label>感度</label><div class="range"><input type="range" id="sens" min="0.5" max="2" step="0.1"><output></output></div></div>
+      <div class="field"><label>知らせるまでの猶予</label><div class="range"><input type="range" id="badDelay" min="0.5" max="10" step="0.5"><output></output></div></div>
+      <div class="field"><label>元に戻るまでのキープ時間</label><div class="range"><input type="range" id="holdSec" min="1" max="10" step="0.5"><output></output></div></div>
+    </div>
+    <div class="card">
+      <h3>四隅の表示</h3>
+      <div class="seg" id="intensity"><button data-v="subtle">控えめ</button><button data-v="normal">標準</button><button data-v="vivid">はっきり</button></div>
+      <label class="sw" style="margin-top:8px"><span>理由を画面上部に表示<small>オフなら四隅の色だけで知らせます</small></span><input type="checkbox" class="toggle" id="showMsg"></label>
+    </div>
+    <div class="card">
+      <h3>データ</h3>
+      <div class="row-btns"><button class="btn sm" id="resetCal">キャリブレーションをやり直す</button><button class="btn sm" id="resetHist">記録を消去</button></div>
+      <p class="note" style="margin:12px 0 0">記録はこの端末内にのみ保存されます。レポート配信を設定した場合のみ、集計値（映像を含まない）が指定先に送られます。</p>
+    </div>
+  </section>
+
+  <footer><span id="disclaimer"></span><br>研究・検証用の実験的再現です。原製品・特許権者とは無関係です。</footer>
+</div>
+
+<div id="corners"><i></i><i></i><i></i><i></i></div>
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="calib">
+  <div class="sheet">
+    <h2 id="calTitle"></h2>
+    <p id="calMsg"></p>
+    <div class="cring">
+      <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface-2)" stroke-width="10"/><circle id="calArc" cx="60" cy="60" r="50" fill="none" stroke="url(#grad)" stroke-width="10" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16"/></svg>
+      <b id="calNum"></b>
+    </div>
+    <div class="actions"><button class="btn" id="calCancel">あとで</button><button class="btn primary" id="calGo">開始</button></div>
+  </div>
+</div>
+
+<script type="module" src="../core/app.js"></script>
+</body>
+</html>

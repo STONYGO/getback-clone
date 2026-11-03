@@ -1,9 +1,13 @@
-// GetBack Clone — デスクトップ常駐版
-// ・コントロールウィンドウ（カメラ/キャリブレーション/設定）を閉じてもトレイ常駐で計測を継続
-// ・全ディスプレイに「クリック透過・最前面・透明」のオーバーレイを重ね、四隅を赤/緑に光らせる
+// Posture Lab デスクトップ常駐版（GetBack Clone / KAMAE Lite / KAMAE AI 共通）
+// ・起動後はメニューバー／タスクトレイに常駐。ウィンドウは初回・キャリブレーション時・ユーザーが開いたときだけ表示
+// ・全ディスプレイに「クリック透過・最前面・透明」のオーバーレイを重ね、四隅だけを控えめに色づける
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, protocol, net, session, systemPreferences } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { pathToFileURL } = require("url");
+
+const PRODUCT = require("./product.json");
+app.setName(PRODUCT.name);
 
 // 非表示中もカメラと計測を止めない
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
@@ -11,12 +15,10 @@ app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 app.commandLine.appendSwitch("disable-background-media-suspend");
 
-// app:// で配信（カメラ・WASM・fetch を安全なオリジンで使うため）
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
 ]);
-
-if (!app.requestSingleInstanceLock()) { app.quit(); }
+if (!app.requestSingleInstanceLock()) app.quit();
 
 let control = null, tray = null, overlays = [], quitting = false;
 let monitoring = false, lastStatus = "起動中", lastOverlay = { mode: null };
@@ -30,29 +32,29 @@ function icon(name) {
   return ICONS[name];
 }
 
-function createControl() {
-  control = new BrowserWindow({
-    width: 460, height: 820, minWidth: 380, title: "GetBack",
-    backgroundColor: "#0f1115", show: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      backgroundThrottling: false, contextIsolation: true, nodeIntegration: false,
-    },
-  });
-  control.loadURL("app://local/renderer/index.html");
-  // 閉じる＝トレイへ格納（計測は継続）
-  control.on("close", (e) => {
-    if (!quitting) {
-      e.preventDefault(); control.hide();
-      if (process.platform === "darwin") app.dock?.hide();
-    }
-  });
+function firstRunSetup() {
+  // 初回起動時：ログイン時に背景で自動起動するよう設定（トレイメニューで解除可）
+  const flag = path.join(app.getPath("userData"), "first-run.done");
+  if (fs.existsSync(flag)) return;
+  try { app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true, args: ["--hidden"] }); } catch {}
+  fs.writeFileSync(flag, new Date().toISOString());
 }
 
-function showControl() {
-  if (process.platform === "darwin") app.dock?.show();
-  control.show(); control.focus();
+function createControl() {
+  control = new BrowserWindow({
+    width: 480, height: 860, minWidth: 380, title: app.name, show: false,
+    backgroundColor: "#f6f7f9", titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, "preload.js"), backgroundThrottling: false, contextIsolation: true, nodeIntegration: false },
+  });
+  control.loadURL(`app://local/renderer/${PRODUCT.id}/index.html`);
+  control.on("close", (e) => {
+    if (!quitting) { e.preventDefault(); hideControl(); }
+  });
 }
+function showControl(user) {
+  if (user) autoShown = false; if (process.platform === "darwin") app.dock?.show(); control.show(); control.focus(); }
+function hideControl() { control.hide(); if (process.platform === "darwin") app.dock?.hide(); }
 
 function createOverlays() {
   overlays.forEach((w) => !w.isDestroyed() && w.destroy());
@@ -66,7 +68,7 @@ function createOverlays() {
     });
     w.setAlwaysOnTop(true, "screen-saver");
     w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    w.setIgnoreMouseEvents(true); // クリックはすべて下のアプリへ
+    w.setIgnoreMouseEvents(true);
     w.loadFile(path.join(__dirname, "overlay", "overlay.html"));
     w.once("ready-to-show", () => { w.showInactive(); w.webContents.send("overlay", lastOverlay); });
     return w;
@@ -74,60 +76,53 @@ function createOverlays() {
 }
 
 function buildMenu() {
-  const menu = Menu.buildFromTemplate([
-    { label: `状態：${lastStatus}`, enabled: false },
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: `${app.name}：${lastStatus}`, enabled: false },
     { type: "separator" },
-    { label: monitoring ? "監視を一時停止" : "監視を開始", click: () => control.webContents.send("command", "toggle") },
-    { label: "キャリブレーション", click: () => { showControl(); control.webContents.send("command", "calibrate"); } },
-    { label: "ウィンドウを表示（設定・カメラ確認）", click: showControl },
+    { label: monitoring ? "見守りを一時停止" : "見守りを再開", click: () => control.webContents.send("command", "toggle") },
+    { label: "キャリブレーション", click: () => { showControl(true); control.webContents.send("command", "calibrate"); } },
+    { label: "日次レポートを今すぐ送信", click: () => control.webContents.send("command", "report") },
+    { label: "ダッシュボードを開く", click: () => showControl(true) },
     { type: "separator" },
-    {
-      label: "ログイン時に自動起動", type: "checkbox",
-      checked: app.getLoginItemSettings().openAtLogin,
-      click: (mi) => app.setLoginItemSettings({ openAtLogin: mi.checked }),
-    },
+    { label: "ログイン時に自動起動", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin,
+      click: (mi) => app.setLoginItemSettings({ openAtLogin: mi.checked, openAsHidden: true, args: ["--hidden"] }) },
     { label: "終了", click: () => { quitting = true; app.quit(); } },
-  ]);
-  tray.setContextMenu(menu);
+  ]));
 }
-
 function updateTray() {
-  const mode = lastOverlay.mode;
-  tray.setImage(icon(!monitoring ? "idle" : mode === "red" ? "red" : "green"));
-  tray.setToolTip(`GetBack — ${lastStatus}`);
+  const m = lastOverlay.mode;
+  tray.setImage(icon(!monitoring ? "idle" : m === "red" ? "red" : m === "amber" ? "amber" : "green"));
+  tray.setToolTip(`${app.name} — ${lastStatus}`);
   buildMenu();
 }
 
-// ---- レンダラーからの通知 ----
 ipcMain.on("overlay", (_e, data) => {
   const changed = data.mode !== lastOverlay.mode;
   lastOverlay = data;
   overlays.forEach((w) => !w.isDestroyed() && w.webContents.send("overlay", data));
-  if (changed) updateTray();
+  if (changed && tray) updateTray();
 });
-ipcMain.on("status", (_e, title) => {
-  if (title !== lastStatus) { lastStatus = title; tray && updateTray(); }
+ipcMain.on("status", (_e, title) => { if (title !== lastStatus) { lastStatus = title; tray && updateTray(); } });
+ipcMain.on("monitoring", (_e, on) => { monitoring = on; if (!on) ipcMain.emit("overlay", null, { mode: null }); tray && updateTray(); });
+// 初回・キャリブレーション時は自動で表示し、完了したら自動で背景に戻す（ユーザーが自分で開いた場合は閉じない）
+let autoShown = false;
+ipcMain.on("needUI", (_e, on) => {
+  if (on) { if (!control.isVisible()) autoShown = true; showControl(); }
+  else if (autoShown) { autoShown = false; setTimeout(hideControl, 600); }
 });
-ipcMain.on("monitoring", (_e, on) => { monitoring = on; if (!on) ipcMain.emit("overlay", null, { mode: null }); updateTray(); });
 
-app.on("second-instance", () => control && showControl());
+app.on("second-instance", () => control && showControl(true));
 app.on("before-quit", () => { quitting = true; });
 app.on("window-all-closed", (e) => e.preventDefault());
 
 app.whenReady().then(async () => {
-  // app://local/... → アプリ同梱ファイル
-  protocol.handle("app", (req) => {
-    const rel = decodeURIComponent(new URL(req.url).pathname);
-    return net.fetch(pathToFileURL(path.join(__dirname, rel)).toString());
-  });
+  protocol.handle("app", (req) => net.fetch(pathToFileURL(path.join(__dirname, decodeURIComponent(new URL(req.url).pathname))).toString()));
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === "media"));
   session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === "media");
-  if (process.platform === "darwin") {
-    try { await systemPreferences.askForMediaAccess("camera"); } catch {}
-  }
-
+  if (process.platform === "darwin") { app.dock?.hide(); try { await systemPreferences.askForMediaAccess("camera"); } catch {} }
+  firstRunSetup();
   tray = new Tray(icon("idle"));
-  tray.on("click", () => (process.platform === "win32" ? showControl() : tray.popUpContextMenu()));
+  tray.on("click", () => (process.platform === "win32" ? showControl(true) : tray.popUpContextMenu()));
   createOverlays();
   createControl();
   updateTray();

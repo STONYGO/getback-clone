@@ -1,7 +1,7 @@
 {
   "name": "getback-desktop",
   "productName": "GetBack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "姿勢モニター（GetBackクローン）デスクトップ常駐版",
   "main": "main.js",
   "author": "STONY & Co.",
@@ -28,10 +28,18 @@
       "overlay/**",
       "renderer/**",
       "assets/**",
+      "product.json",
       "package.json"
     ],
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "category": "public.app-category.healthcare-fitness",
       "icon": "assets/icon.png",
       "extendInfo": {
@@ -41,10 +49,28 @@
       "identity": null
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.png"
     },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
-    "portable": { "artifactName": "GetBack-portable-${version}.exe" }
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "GetBack-portable-${version}.exe"
+    }
   }
 }
