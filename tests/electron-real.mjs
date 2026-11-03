@@ -31,9 +31,15 @@ try {
   await ctl.evaluate(CAM_SCRIPT, IMG);
   await ctl.evaluate(() => { window.__app.cfg.badDelay = 1.5; });
   check("初回はウィンドウを自動表示", await ctlVisible(), "");
-  await sleep(1500);
-  await ctl.click("#calGo");
-  await ctl.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 30000 });
+  await sleep(2000);
+  await ctl.screenshot({ path: path.join(out, `desktop-${product.id}-start.png`) });
+  let ok = false;
+  for (let i = 0; i < 3 && !ok; i++) {
+    await ctl.click("#calGo");
+    try { await ctl.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 15000 }); ok = true; }
+    catch { console.log("calib retry:", await ctl.evaluate(() => document.querySelector("#calMsg").textContent + " feat=" + JSON.stringify(window.__app.S.feat))); }
+  }
+  if (!ok) throw new Error("calibration failed");
   await sleep(1500);
   check("キャリブレーション後に自動で背景へ（ウィンドウ非表示）", !(await ctlVisible()), "");
   await ctl.evaluate((r) => { window.__cam.rot = r; }, product.id === "getback" ? 0 : 9);

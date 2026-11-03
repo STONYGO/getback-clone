@@ -21,17 +21,22 @@ async function setupPage(browser, pid) {
   await page.click("#btnMain");
   await page.waitForFunction(() => window.__app.S.running, null, { timeout: 60000 });
   const info = await page.evaluate(CAM_SCRIPT, IMG);
-  await page.click("#btnCam");
+  await sleep(1500);
+  await page.screenshot({ path: path.join(out, `${pid}-start.png`) });
+  await page.evaluate(() => document.querySelector("#cam").classList.remove("hide"));
   await sleep(1500);
   return { page, errs, info };
 }
 const st = (page) => page.evaluate(() => ({ title: document.querySelector("#stTitle").textContent, sub: document.querySelector("#stSub").textContent, corners: document.querySelector("#corners").className, feat: window.__app.S.feat }));
 const cam = (page, o) => page.evaluate((o) => Object.assign(window.__cam, o), o);
-async function calibrate(page) {
-  if (!(await page.$eval("#calib", (e) => e.classList.contains("on")))) await page.click("#btnCalib");
-  await page.click("#calGo");
-  await page.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 30000 });
-  await sleep(1500);
+export async function calibrate(page, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    if (!(await page.$eval("#calib", (e) => e.classList.contains("on")))) await page.click("#btnCalib");
+    await page.click("#calGo");
+    try { await page.waitForFunction(() => window.__app.S.monitoring, null, { timeout: 15000 }); await sleep(1500); return; }
+    catch { console.log("calib retry:", await page.evaluate(() => document.querySelector("#calMsg").textContent + " feat=" + JSON.stringify(window.__app.S.feat))); }
+  }
+  throw new Error("calibration failed: " + (await page.evaluate(() => document.querySelector("#calMsg").textContent)));
 }
 async function waitCorner(page, mode, ms = 8000) {
   const t = Date.now();
